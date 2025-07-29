@@ -1,30 +1,37 @@
-SELECT
-    -- Approval Percentage by Count
-    (
-        (SELECT Pmt_Approval_TransactionId FROM For_Dun_Commercial_FA) +
-        (SELECT Pmt_Approval_TransactionId FROM For_Dun_Consumer_FA) +
-        (SELECT Pmt_Approval_TransactionId FROM For_Pmt_Approval_CI_FA_NoPayNow) +
-        (SELECT Pmt_Approval_TransactionId FROM For_Pmt_Approval_MI_FA_NoDun)
-    ) * 100.0 /
-    NULLIF(
-        (SELECT Pmt_Terminal_TransactionId FROM For_Dun_Commercial_FA) +
-        (SELECT Pmt_Terminal_TransactionId FROM For_Dun_Consumer_FA) +
-        (SELECT Pmt_Terminal_TransactionId FROM For_Pmt_Approval_CI_FA_NoPayNow) +
-        (SELECT Pmt_Terminal_TransactionId FROM For_Pmt_Approval_MI_FA_NoDun),
-        0
-    ) AS Approval_Percentage_FA,
+"Pmt_Total$", "expression": [ "", "[Pmt_Total$_Dun_Commercial] + [Pmt_Total$_Dun_Consumer] + [Pmt_Total$_CI_NoPayNow] + [Pmt_Total$_MI_NoDun]"
+"Pmt_Total$_Dun_Commercial", "expression": [ "CALCULATE (", " SUM ( [AmountUSD] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( (DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated") || DimPayment[IsPayNow] ),", " KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Commercial" ),", " KEEPFILTERS ( DimDunningNew[IsLatestDunAttemptByCycle] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )",
+"Pmt_Total$_Dun_Consumer", "expression": [ "CALCULATE (", " SUM ( [AmountUSD] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( (DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated") || DimPayment[IsPayNow] ),", " KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Consumer" ),", " KEEPFILTERS ( DimDunningNew[IsLatestDunAttemptByCycle] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )", ")"
+"Pmt_Total$_CI_NoPayNow", "expression": [ " CALCULATE(", " [Pmt_Total$_CI],", " KEEPFILTERS (NOT(DimPayment[IsPayNow]))", ")"
+"Pmt_Total$_CI_FA_NoPayNow", "expression": [ " CALCULATE(", " [Pmt_Total$_CI_FA],", " KEEPFILTERS (NOT(DimPayment[IsPayNow]))", ")"
+"Pmt_Total$_MI_NoDun", "expression": [ " CALCULATE(", " [Pmt_Total$_MI],", " KEEPFILTERS (NOT(DimDunningNew[IsDunningCycle]))", ")"
+"Pmt_Total$_MI_FA_NoDun", "expression": [ " CALCULATE(", " [Pmt_Total$_MI_FA],", " KEEPFILTERS (NOT(DimDunningNew[IsDunningCycle]))", ")"
 
-    -- Approval Percentage by Amount (Dollar)
-    (
-        (SELECT Pmt_Approval_TransactionAmount FROM For_Dun_Commercial_FA) +
-        (SELECT Pmt_Approval_TransactionAmount FROM For_Dun_Consumer_FA) +
-        (SELECT Pmt_Approval_TransactionAmount FROM For_Pmt_Approval_CI_FA_NoPayNow) +
-        (SELECT Pmt_Approval_TransactionAmount FROM For_Pmt_Approval_MI_FA_NoDun)
-    ) * 100.0 /
-    NULLIF(
-        (SELECT Pmt_Terminal_TransactionAmount FROM For_Dun_Commercial_FA) +
-        (SELECT Pmt_Terminal_TransactionAmount FROM For_Dun_Consumer_FA) +
-        (SELECT Pmt_Terminal_TransactionAmount FROM For_Pmt_Approval_CI_FA_NoPayNow) +
-        (SELECT Pmt_Terminal_TransactionAmount FROM For_Pmt_Approval_MI_FA_NoDun),
-        0
-    ) AS Approval_PercentageDoller_FA
+
+2) name": "Pmt_Approval$", "expression": [ "", "[Pmt_Approval$_Dun_Commercial] + [Pmt_Approval$_Dun_Consumer] + [Pmt_Approval$_CI_NoPayNow] + [Pmt_Approval$_MI_NoDun]"
+"Pmt_Approval$_Dun_Commercial", "expression": [ "CALCULATE (", " SUM ( [AmountUSD] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthApproval],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( (DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated") || DimPayment[IsPayNow] ),", " KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Commercial" ),", " KEEPFILTERS ( DimDunningNew[IsLatestDunAttemptByCycle] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )",
+
+"Pmt_Approval$_Dun_Consumer", "expression": [ "CALCULATE (", " SUM ( [AmountUSD] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthApproval],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( (DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated") || DimPayment[IsPayNow] ),", " KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Consumer" ),", " KEEPFILTERS ( DimDunningNew[IsLatestDunAttemptByCycle] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )",
+"Pmt_Approval$_CI_NoPayNow", "expression": [ " CALCULATE(", " [Pmt_Approval$_CI],", " KEEPFILTERS (NOT(DimPayment[IsPayNow]))", ")"
+"Pmt_Approval$_CI", "expression": [ "", "CALCULATE (", " SUM ( [AmountUSD] ),", " DimPayment[IsAuthApproval],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( DimPayment[CustomerOrMerchantInitiated] == "CustomerInitiated" ),", " KEEPFILTERS ( DimRetry[IsLastCustomerRetry] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry]", " || DimRetry[IsLastDynamicRetry] == BLANK ()", " )",
+
+Pmt_Approval$_MI_NoDun", "expression": [ " CALCULATE(", " [Pmt_Approval$_MI],", " KEEPFILTERS (NOT(DimDunningNew[IsDunningCycle]))", ")"
+"Pmt_Approval$_MI", "expression": [ "CALCULATE (", " SUM ( [AmountUSD] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthApproval],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated" ),", " -- KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Consumer" ),", " KEEPFILTERS (", " DimDunningNew[IsLastMerchantRetry] || ISBLANK ( DimDunningNew[DunAttemptByCycle] )", " ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )", ")"
+
+3) "Pmt_Approval#", "expression": [ "", "[Pmt_Approval#_Dun_Commercial] + [Pmt_Approval#_Dun_Consumer] + [Pmt_Approval#_CI_NoPayNow] + [Pmt_Approval#_MI_NoDun]"
+"Pmt_Approval#_Dun_Commercial", "expression": [ "CALCULATE (", " SUM ( [TransactionCount] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthApproval],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( (DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated") || DimPayment[IsPayNow] ),", " KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Commercial" ),", " KEEPFILTERS ( DimDunningNew[IsLatestDunAttemptByCycle] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )",
+
+"Pmt_Approval#_Dun_Consumer", "expression": [ "CALCULATE (", " SUM ( [TransactionCount] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthApproval],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( (DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated") || DimPayment[IsPayNow] ),", " KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Consumer" ),", " KEEPFILTERS ( DimDunningNew[IsLatestDunAttemptByCycle] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )", ")"
+"Pmt_Approval#_CI_NoPayNow", "expression": [ " CALCULATE(", " [Pmt_Approval#_CI],", " KEEPFILTERS (NOT(DimPayment[IsPayNow]))",
+"Pmt_Approval#_CI", "expression": [ "", "CALCULATE (", " SUM ( [TransactionCount] ),", " DimPayment[IsAuthApproval],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( DimPayment[CustomerOrMerchantInitiated] == "CustomerInitiated" ),", " KEEPFILTERS ( DimRetry[IsLastCustomerRetry] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry]", " || DimRetry[IsLastDynamicRetry] == BLANK ()", " )",
+"Pmt_Approval#_MI_NoDun", "expression": [ " CALCULATE(", " [Pmt_Approval#_MI],", " KEEPFILTERS (NOT(DimDunningNew[IsDunningCycle]))", ")"
+
+4) name": "Pmt_Total#", "expression": [ "", "[Pmt_Total#_Dun_Commercial] + [Pmt_Total#_Dun_Consumer] + [Pmt_Total#_CI_NoPayNow] + [Pmt_Total#_MI_NoDun]"
+"Pmt_Total#_Dun_Commercial", "expression": [ "CALCULATE (", " SUM ( [TransactionCount] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( (DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated") || DimPayment[IsPayNow] ),", " KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Commercial" ),", " KEEPFILTERS ( DimDunningNew[IsLatestDunAttemptByCycle] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )",
+
+"Pmt_Total#_Dun_Consumer", "expression": [ "CALCULATE (", " SUM ( [TransactionCount] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( (DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated") || DimPayment[IsPayNow] ),", " KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Consumer" ),", " KEEPFILTERS ( DimDunningNew[IsLatestDunAttemptByCycle] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )",
+
+"Pmt_Total#_CI_NoPayNow", "expression": [ " CALCULATE(", " [Pmt_Total#_CI],", " KEEPFILTERS (NOT(DimPayment[IsPayNow]))", ")"
+Pmt_Total#_CI", "expression": [ "", "CALCULATE (", " SUM ( [TransactionCount] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( DimPayment[CustomerOrMerchantInitiated] == "CustomerInitiated" ),", " KEEPFILTERS ( DimRetry[IsLastCustomerRetry] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry]", " || DimRetry[IsLastDynamicRetry] == BLANK ()", " )", ")"
+
+"Pmt_Total#_MI_NoDun", "expression": [ " CALCULATE(", " [Pmt_Total#_MI],", " KEEPFILTERS (NOT(DimDunningNew[IsDunningCycle]))", ")"
+"Pmt_Total#_MI", "expression": [ "CALCULATE (", " SUM ( [TransactionCount] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated" ),", " -- KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Consumer" ),", " KEEPFILTERS (", " DimDunningNew[IsLastMerchantRetry] || ISBLANK ( DimDunningNew[DunAttemptByCycle] )", " ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )",
