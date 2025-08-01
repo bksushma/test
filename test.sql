@@ -1,14 +1,5 @@
-SELECT
-    COUNT(CASE WHEN IsAuthApproval = TRUE THEN 1 END) AS Pmt_Approval_TransactionId,
-    SUM(CASE WHEN IsAuthApproval = TRUE THEN AmountUSD END) AS Pmt_Approval_TransactionAmount,
-    COUNT(CASE WHEN IsAuthTerminalState = TRUE THEN 1 END) AS Pmt_Terminal_TransactionId,
-    SUM(CASE WHEN IsAuthTerminalState = TRUE THEN AmountUSD END) AS Pmt_Terminal_TransactionAmount
-FROM gold.transactions
-WHERE 
-    ProviderName <> 'Stored Value'
-    AND IsTransactionAbandoned = FALSE
-    AND (CustomerOrMerchantInitiated = 'MerchantInitiated' OR IsPayNow = TRUE)
-    AND ConsumerOrCommercial = 'Commercial'
-    AND IsLatestDunAttemptByCycle = TRUE
-    AND (IsLastDynamicRetry = TRUE OR IsLastDynamicRetry IS NULL)
-    AND DATE = '2025-07-01'
+"Pmt_Total#_CI_NoPayNow", "expression": [ " CALCULATE(", " [Pmt_Total#_CI],", " KEEPFILTERS (NOT(DimPayment[IsPayNow]))", ")"
+Pmt_Total#_CI", "expression": [ "", "CALCULATE (", " SUM ( [TransactionCount] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( DimPayment[CustomerOrMerchantInitiated] == "CustomerInitiated" ),", " KEEPFILTERS ( DimRetry[IsLastCustomerRetry] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry]", " || DimRetry[IsLastDynamicRetry] == BLANK ()", " )", ")"
+
+"Pmt_Total#_MI_NoDun", "expression": [ " CALCULATE(", " [Pmt_Total#_MI],", " KEEPFILTERS (NOT(DimDunningNew[IsDunningCycle]))", ")"
+"Pmt_Total#_MI", "expression": [ "CALCULATE (", " SUM ( [TransactionCount] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated" ),", " -- KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Consumer" ),", " KEEPFILTERS (", " DimDunningNew[IsLastMerchantRetry] || ISBLANK ( DimDunningNew[DunAttemptByCycle] )", " ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )",
