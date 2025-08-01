@@ -1,5 +1,20 @@
-"Pmt_Total#_CI_NoPayNow", "expression": [ " CALCULATE(", " [Pmt_Total#_CI],", " KEEPFILTERS (NOT(DimPayment[IsPayNow]))", ")"
-Pmt_Total#_CI", "expression": [ "", "CALCULATE (", " SUM ( [TransactionCount] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( DimPayment[CustomerOrMerchantInitiated] == "CustomerInitiated" ),", " KEEPFILTERS ( DimRetry[IsLastCustomerRetry] ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry]", " || DimRetry[IsLastDynamicRetry] == BLANK ()", " )", ")"
+SELECT
+    SUM(CASE WHEN IsAuthTerminalState = TRUE
+           AND ProviderName <> 'Stored Value'
+           AND IsTransactionAbandoned = FALSE
+           AND CustomerOrMerchantInitiated = 'CustomerInitiated'
+           AND IsLastCustomerRetry = TRUE
+           AND (IsLastDynamicRetry = TRUE OR IsLastDynamicRetry IS NULL)
+           AND IsPayNow = FALSE
+         THEN TransactionCount END) AS Pmt_TotalNum_CI_NoPayNow,
 
-"Pmt_Total#_MI_NoDun", "expression": [ " CALCULATE(", " [Pmt_Total#_MI],", " KEEPFILTERS (NOT(DimDunningNew[IsDunningCycle]))", ")"
-"Pmt_Total#_MI", "expression": [ "CALCULATE (", " SUM ( [TransactionCount] ),", " USERELATIONSHIP ( 'Payment Measures'[FirstAttemptDate], DimDate[Date] ),", " DimPayment[IsAuthTerminalState],", " KEEPFILTERS ( DimPayment[ProviderName] <> "Stored Value" ),", " KEEPFILTERS ( NOT(DimPayment[IsTransactionAbandoned]) ),", " KEEPFILTERS ( DimPayment[CustomerOrMerchantInitiated] == "MerchantInitiated" ),", " -- KEEPFILTERS ( DimPayment[ConsumerOrCommercial] == "Consumer" ),", " KEEPFILTERS (", " DimDunningNew[IsLastMerchantRetry] || ISBLANK ( DimDunningNew[DunAttemptByCycle] )", " ),", " KEEPFILTERS (", " DimRetry[IsLastDynamicRetry] || ISBLANK ( DimRetry[IsLastDynamicRetry] )", " )",
+    SUM(CASE WHEN IsAuthTerminalState = TRUE
+           AND ProviderName <> 'Stored Value'
+           AND IsTransactionAbandoned = FALSE
+           AND CustomerOrMerchantInitiated = 'MerchantInitiated'
+           AND (IsLastMerchantRetry = TRUE OR DunAttemptByCycle IS NULL)
+           AND (IsLastDynamicRetry = TRUE OR IsLastDynamicRetry IS NULL)
+           AND IsDunningCycle = FALSE
+         THEN TransactionCount END) AS Pmt_TotalNum_MI_NoDun
+
+FROM gold.transactions
