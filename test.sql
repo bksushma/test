@@ -1,61 +1,65 @@
-%sql ---Pmt_Approval#, Pmt_Approval$
-with For_Dun_Commercial As(SELECT
-    COUNT(CASE WHEN IsAuthApproval = TRUE THEN 1 END) AS Pmt_Approval_TransactionId,
-    SUM(CASE WHEN IsAuthApproval = TRUE THEN AmountUSD END) AS Pmt_Approval_TransactionAmount,
-    COUNT(CASE WHEN IsAuthTerminalState = TRUE THEN 1 END) AS Pmt_Terminal_TransactionId,
-    SUM(CASE WHEN IsAuthTerminalState = TRUE THEN AmountUSD END) AS Pmt_Terminal_TransactionAmount
-  FROM gold.transactions
-  WHERE ProviderName <> 'Stored Value'
-    and IsTransactionAbandoned = FALSE
-    AND (CustomerOrMerchantInitiated = 'MerchantInitiated' OR IsPayNow = TRUE)
-    AND ConsumerOrCommercial = 'Commercial'
-    AND IsLatestDunAttemptByCycle = TRUE
-    AND (IsLastDynamicRetry = TRUE OR IsLastDynamicRetry IS NULL)
-    AND COALESCE(TO_DATE(DunningFirstAttemptDateByCycle), Date) = "2025-07-01"
-),
-For_Dun_Consumer As(SELECT
-    COUNT(CASE WHEN IsAuthApproval = TRUE THEN 1 END) AS Pmt_Approval_TransactionId,
-    SUM(CASE WHEN IsAuthApproval = TRUE THEN AmountUSD END) AS Pmt_Approval_TransactionAmount,
-    COUNT(CASE WHEN IsAuthTerminalState = TRUE THEN 1 END) AS Pmt_Terminal_TransactionId,
-    SUM(CASE WHEN IsAuthTerminalState = TRUE THEN AmountUSD END) AS Pmt_Terminal_TransactionAmount
-FROM gold.transactions
-WHERE 
-    ProviderName <> 'Stored Value'
-    AND IsTransactionAbandoned = FALSE
-    AND (CustomerOrMerchantInitiated = 'MerchantInitiated' OR IsPayNow = TRUE)
-    AND ConsumerOrCommercial = 'Consumer'
-    AND IsLatestDunAttemptByCycle = TRUE
-    AND (IsLastDynamicRetry = TRUE OR IsLastDynamicRetry IS NULL)
-    AND COALESCE(TO_DATE(DunningFirstAttemptDateByCycle), Date) = "2025-07-01"
-),
+let For_Dun_Commercial = 
+    gold_transactions
+    | where ProviderName != "Stored Value"
+        and IsTransactionAbandoned == false
+        and (CustomerOrMerchantInitiated == "MerchantInitiated" or IsPayNow == true)
+        and ConsumerOrCommercial == "Commercial"
+        and IsLatestDunAttemptByCycle == true
+        and (IsLastDynamicRetry == true or isnull(IsLastDynamicRetry))
+        and coalesce(todatetime(DunningFirstAttemptDateByCycle), Date) == datetime(2025-07-01)
+    | summarize 
+        Pmt_Approval_TransactionId = countif(IsAuthApproval == true),
+        Pmt_Approval_TransactionAmount = sumif(AmountUSD, IsAuthApproval == true);
 
-For_Pmt_Approval_CI_NoPayNow as (SELECT
-  COUNT(CASE WHEN IsPayNow = FALSE and IsAuthApproval = TRUE THEN TransactionId END) AS Pmt_Approval_TransactionId,
-  SUM(CASE WHEN IsAuthApproval = TRUE and IsPayNow = FALSE THEN AmountUSD END) AS Pmt_Approval_TransactionAmount,
-  COUNT(CASE WHEN IsPayNow = FALSE and  IsAuthTerminalState = TRUE THEN 1 END) AS Pmt_Terminal_TransactionId,
-  SUM(CASE WHEN IsAuthTerminalState = TRUE and IsPayNow = FALSE THEN AmountUSD END) AS Pmt_Terminal_TransactionAmount
-FROM gold.transactions
-where ProviderName <> 'Stored Value'
-AND IsTransactionAbandoned = FALSE
-AND CustomerOrMerchantInitiated = 'CustomerInitiated'
-AND IsLastCustomerRetry = TRUE
-AND (IsLastDynamicRetry = TRUE OR IsLastDynamicRetry IS NULL)
-AND COALESCE(TO_DATE(DunningFirstAttemptDateByCycle), Date) = "2025-07-01"
-),
-For_Pmt_Approval_MI_NoDun as (SELECT
-  COUNT(CASE WHEN IsAuthApproval = TRUE and IsDunningCycle = FALSE THEN 1 END) AS Pmt_Approval_TransactionId,
-  SUM(CASE WHEN IsAuthApproval = TRUE and IsDunningCycle = FALSE THEN AmountUSD END) AS Pmt_Approval_TransactionAmount,
-  COUNT(CASE WHEN IsAuthTerminalState = TRUE and IsDunningCycle = FALSE THEN 1 END) AS Pmt_Terminal_TransactionId,
-  SUM(CASE WHEN IsAuthTerminalState = TRUE and  IsDunningCycle = FALSE THEN AmountUSD END) AS Pmt_Terminal_TransactionAmount
-FROM gold.transactions
-WHERE ProviderName <> 'Stored Value'
-AND IsTransactionAbandoned = FALSE
-AND CustomerOrMerchantInitiated = 'MerchantInitiated'
-AND (IsLastDynamicRetry = TRUE OR IsLastDynamicRetry IS NULL)
-AND (IsLastMerchantRetry = true OR DunAttemptByCycle IS NULL)
-AND COALESCE(TO_DATE(DunningFirstAttemptDateByCycle), Date) = "2025-07-01"
-)
+let For_Dun_Consumer = 
+    gold_transactions
+    | where ProviderName != "Stored Value"
+        and IsTransactionAbandoned == false
+        and (CustomerOrMerchantInitiated == "MerchantInitiated" or IsPayNow == true)
+        and ConsumerOrCommercial == "Consumer"
+        and IsLatestDunAttemptByCycle == true
+        and (IsLastDynamicRetry == true or isnull(IsLastDynamicRetry))
+        and coalesce(todatetime(DunningFirstAttemptDateByCycle), Date) == datetime(2025-07-01)
+    | summarize 
+        Pmt_Approval_TransactionId = countif(IsAuthApproval == true),
+        Pmt_Approval_TransactionAmount = sumif(AmountUSD, IsAuthApproval == true);
 
-select (select Pmt_Approval_TransactionId from For_Dun_Commercial)+(select Pmt_Approval_TransactionId from For_Dun_Consumer)+(select Pmt_Approval_TransactionId from For_Pmt_Approval_CI_NoPayNow)+(select Pmt_Approval_TransactionId from For_Pmt_Approval_MI_NoDun) as Pmt_Approvalcount,
+let For_Pmt_Approval_CI_NoPayNow =
+    gold_transactions
+    | where ProviderName != "Stored Value"
+        and IsTransactionAbandoned == false
+        and CustomerOrMerchantInitiated == "CustomerInitiated"
+        and IsLastCustomerRetry == true
+        and (IsLastDynamicRetry == true or isnull(IsLastDynamicRetry))
+        and IsPayNow == false
+        and coalesce(todatetime(DunningFirstAttemptDateByCycle), Date) == datetime(2025-07-01)
+    | summarize 
+        Pmt_Approval_TransactionId = countif(IsAuthApproval == true),
+        Pmt_Approval_TransactionAmount = sumif(AmountUSD, IsAuthApproval == true);
 
-(select Pmt_Approval_TransactionAmount from For_Dun_Commercial)+(select Pmt_Approval_TransactionAmount from For_Dun_Consumer)+(select Pmt_Approval_TransactionAmount from For_Pmt_Approval_CI_NoPayNow)+(select Pmt_Approval_TransactionAmount from For_Pmt_Approval_MI_NoDun) as Pmt_ApprovallDoller
+let For_Pmt_Approval_MI_NoDun =
+    gold_transactions
+    | where ProviderName != "Stored Value"
+        and IsTransactionAbandoned == false
+        and CustomerOrMerchantInitiated == "MerchantInitiated"
+        and (IsLastDynamicRetry == true or isnull(IsLastDynamicRetry))
+        and (IsLastMerchantRetry == true or isnull(DunAttemptByCycle))
+        and IsDunningCycle == false
+        and coalesce(todatetime(DunningFirstAttemptDateByCycle), Date) == datetime(2025-07-01)
+    | summarize 
+        Pmt_Approval_TransactionId = countif(IsAuthApproval == true),
+        Pmt_Approval_TransactionAmount = sumif(AmountUSD, IsAuthApproval == true);
+
+datatable(dummy:int) [1]
+| extend
+    Pmt_Approvalcount = 
+        toscalar(For_Dun_Commercial | project Pmt_Approval_TransactionId) +
+        toscalar(For_Dun_Consumer | project Pmt_Approval_TransactionId) +
+        toscalar(For_Pmt_Approval_CI_NoPayNow | project Pmt_Approval_TransactionId) +
+        toscalar(For_Pmt_Approval_MI_NoDun | project Pmt_Approval_TransactionId),
+    Pmt_ApprovalDoller =
+        toscalar(For_Dun_Commercial | project Pmt_Approval_TransactionAmount) +
+        toscalar(For_Dun_Consumer | project Pmt_Approval_TransactionAmount) +
+        toscalar(For_Pmt_Approval_CI_NoPayNow | project Pmt_Approval_TransactionAmount) +
+        toscalar(For_Pmt_Approval_MI_NoDun | project Pmt_Approval_TransactionAmount)
+| project-away dummy
