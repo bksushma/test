@@ -104,7 +104,7 @@ ORDER BY
 
 
 %sql
-select SubscriptionId from gold.transactions
+select TransactionId from gold.transactions where SubscriptionId is not null
 
 
 
