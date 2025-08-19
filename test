@@ -1,0 +1,52 @@
+%sql -- NO --doc WITHfilters--hard
+WITH declined_transactions AS (
+    SELECT 
+        BillingRecordId,
+        DATE_FORMAT(DATE_TRUNC('MONTH', DunningFirstAttemptDate),'yyyy-MM-dd') AS DeclineMonth,
+        DunningFirstAttemptDate,
+        SubscriptionId
+    FROM gold.transactions
+    WHERE 
+        CAST(DunningFirstAttemptDate AS DATE) >= '2025-01-01'
+        AND IsAuthTerminalState = TRUE
+        AND ProviderName <> 'Stored Value'
+        AND NOT IsTransactionAbandoned
+        AND (CustomerOrMerchantInitiated = 'MerchantInitiated' OR IsPayNow = TRUE)
+        AND ConsumerOrCommercial = 'Consumer'
+        AND DunAttempt = 1
+        AND DynamicRetryAttempt = 0
+        AND TransactionType = 'CHARGE'
+        AND StatusDetailsCode IN (
+            'CVVVALUEMISMATCH',
+            'INCORRECTPINORPASSCODE',
+            'INVALIDPAYMENTINSTRUMENT',
+            'AMOUNTLIMITEXCEEDED',
+            'AUTHENTICATIONREQUIRED',
+            'TRANSACTIONNOTALLOWED',
+            'PROCESSORRISKCHECKDECLINED',
+            'INVALIDMOBIINPUT',
+            'INVALIDLINEITEMDETAIL'
+        )
+),
+approved_transactions AS (
+    SELECT DISTINCT BillingRecordId
+    FROM gold.transactions
+    WHERE TransactionStatus = 'APPROVED'
+)
+SELECT 
+    d.DeclineMonth,
+    COUNT(DISTINCT d.BillingRecordId) AS Total_Declined_Transactions,
+    COUNT(DISTINCT a.BillingRecordId) AS Recovered_Transactions,
+    ROUND(
+        100.0 * COUNT(DISTINCT a.BillingRecordId)
+        / NULLIF(COUNT(DISTINCT d.BillingRecordId), 0), 2
+    ) AS Recovery_Rate_Percent,
+
+    -- ✅ subscriber count only
+    COUNT(DISTINCT CASE WHEN d.SubscriptionId IS NOT NULL THEN d.BillingRecordId END) AS Subscriber_Count
+
+FROM declined_transactions d
+LEFT JOIN approved_transactions a
+    ON d.BillingRecordId = a.BillingRecordId
+GROUP BY d.DeclineMonth
+ORDER BY d.DeclineMonth DESC;
