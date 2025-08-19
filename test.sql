@@ -1,65 +1,111 @@
-let For_Dun_Commercial = 
-    gold_transactions
-    | where ProviderName != "Stored Value"
-        and IsTransactionAbandoned == false
-        and (CustomerOrMerchantInitiated == "MerchantInitiated" or IsPayNow == true)
-        and ConsumerOrCommercial == "Commercial"
-        and IsLatestDunAttemptByCycle == true
-        and (IsLastDynamicRetry == true or isnull(IsLastDynamicRetry))
-        and coalesce(todatetime(DunningFirstAttemptDateByCycle), Date) == datetime(2025-07-01)
-    | summarize 
-        Pmt_Approval_TransactionId = countif(IsAuthApproval == true),
-        Pmt_Approval_TransactionAmount = sumif(AmountUSD, IsAuthApproval == true);
+%sql -- NO --doc WITHfilters--hard
+WITH declined_transactions AS (
+    SELECT 
+        BillingRecordId,
+        DATE_FORMAT(DATE_TRUNC('MONTH', DunningFirstAttemptDate),'yyyy-MM-dd') AS DeclineMonth,
+        DunningFirstAttemptDate
+    FROM 
+        gold.transactions
+    WHERE 
+        cast(DunningFirstAttemptDate AS Date) >= '2025-01-01'
+        AND IsAuthTerminalState = TRUE
+        AND ProviderName <> 'Stored Value'
+        AND NOT IsTransactionAbandoned
+        AND (CustomerOrMerchantInitiated = 'MerchantInitiated' OR IsPayNow = TRUE)
+        AND ConsumerOrCommercial = 'Consumer'
+        AND DunAttempt=1
+        AND DynamicRetryAttempt =0
+        AND TransactionType = "CHARGE"
+        --AND IsLatestDunAttemptByCycle = TRUE
+        --AND (IsLastDynamicRetry = TRUE OR IsLastDynamicRetry IS NULL)
+        AND StatusDetailsCode IN ('CVVVALUEMISMATCH',
+          'INCORRECTPINORPASSCODE',
+          'INVALIDPAYMENTINSTRUMENT',
+            'AMOUNTLIMITEXCEEDED',
+            'AUTHENTICATIONREQUIRED',  
+            'TRANSACTIONNOTALLOWED',
+            'PROCESSORRISKCHECKDECLINED',
+            'INVALIDMOBIINPUT',
+            'INVALIDLINEITEMDETAIL')
+),
+approved_transactions AS (
+    SELECT 
+        BillingRecordId
+    FROM 
+        gold.transactions
+    WHERE 
+        TransactionStatus = 'APPROVED'
+)
+SELECT 
+    d.DeclineMonth,
+    COUNT(DISTINCT d.BillingRecordId) AS Total_Declined_Transactions,
+    COUNT(DISTINCT a.BillingRecordId) AS Recovered_Transactions,
+    ROUND((COUNT(DISTINCT a.BillingRecordId) * 100.0 / COUNT(DISTINCT d.BillingRecordId)), 2) AS Recovery_Rate_Percent
+FROM 
+    declined_transactions d
+LEFT JOIN 
+    approved_transactions a ON d.BillingRecordId = a.BillingRecordId
+GROUP BY 
+    d.DeclineMonth
+ORDER BY 
+    d.DeclineMonth DESC;
 
-let For_Dun_Consumer = 
-    gold_transactions
-    | where ProviderName != "Stored Value"
-        and IsTransactionAbandoned == false
-        and (CustomerOrMerchantInitiated == "MerchantInitiated" or IsPayNow == true)
-        and ConsumerOrCommercial == "Consumer"
-        and IsLatestDunAttemptByCycle == true
-        and (IsLastDynamicRetry == true or isnull(IsLastDynamicRetry))
-        and coalesce(todatetime(DunningFirstAttemptDateByCycle), Date) == datetime(2025-07-01)
-    | summarize 
-        Pmt_Approval_TransactionId = countif(IsAuthApproval == true),
-        Pmt_Approval_TransactionAmount = sumif(AmountUSD, IsAuthApproval == true);
+#soft
+%sql -- yes---doc WITHfilters--soft
+WITH declined_transactions AS (
+    SELECT 
+        BillingRecordId,
+        DATE_FORMAT(DATE_TRUNC('MONTH', DunningFirstAttemptDate),'yyyy-MM-dd') AS DeclineMonth,
+        DunningFirstAttemptDate
+    FROM 
+        gold.transactions
+    WHERE 
+        cast(DunningFirstAttemptDate AS Date) >= '2025-01-01'
+        AND IsAuthTerminalState = TRUE
+        AND ProviderName <> 'Stored Value'
+        AND NOT IsTransactionAbandoned
+        AND (CustomerOrMerchantInitiated = 'MerchantInitiated' OR IsPayNow = TRUE)
+        AND ConsumerOrCommercial = 'Consumer'
+        AND DunAttempt=1
+        AND DynamicRetryAttempt !=0
+        AND TransactionType = "CHARGE"
+        --AND DunAttemptByCycle = 1
+        --AND IsLatestDunAttemptByCycle = TRUE
+        --AND (IsLastDynamicRetry = TRUE OR IsLastDynamicRetry IS NULL)
+        AND StatusDetailsCode IN (
+          'PROCESSORDECLINED',
+            'INSUFFICIENTFUND',
+            'AUTHORIZATIONEXPIRED',
+            'PAYMENTPROCESSORFAILURE',
+            'MISSINGFUNDINGSOURCE',
+            'EXPIREDPAYMENTINSTRUMENT')
+),
+approved_transactions AS (
+    SELECT 
+        BillingRecordId
+    FROM 
+        gold.transactions
+    WHERE 
+        TransactionStatus = 'APPROVED'
+)
+SELECT 
+    d.DeclineMonth,
+    COUNT(DISTINCT d.BillingRecordId) AS Total_Declined_Transactions,
+    COUNT(DISTINCT a.BillingRecordId) AS Recovered_Transactions,
+    ROUND((COUNT(DISTINCT a.BillingRecordId) * 100.0 / COUNT(DISTINCT d.BillingRecordId)), 2) AS Recovery_Rate_Percent
+FROM 
+    declined_transactions d
+LEFT JOIN 
+    approved_transactions a ON d.BillingRecordId = a.BillingRecordId
+GROUP BY 
+    d.DeclineMonth
+ORDER BY 
+    d.DeclineMonth DESC;
 
-let For_Pmt_Approval_CI_NoPayNow =
-    gold_transactions
-    | where ProviderName != "Stored Value"
-        and IsTransactionAbandoned == false
-        and CustomerOrMerchantInitiated == "CustomerInitiated"
-        and IsLastCustomerRetry == true
-        and (IsLastDynamicRetry == true or isnull(IsLastDynamicRetry))
-        and IsPayNow == false
-        and coalesce(todatetime(DunningFirstAttemptDateByCycle), Date) == datetime(2025-07-01)
-    | summarize 
-        Pmt_Approval_TransactionId = countif(IsAuthApproval == true),
-        Pmt_Approval_TransactionAmount = sumif(AmountUSD, IsAuthApproval == true);
 
-let For_Pmt_Approval_MI_NoDun =
-    gold_transactions
-    | where ProviderName != "Stored Value"
-        and IsTransactionAbandoned == false
-        and CustomerOrMerchantInitiated == "MerchantInitiated"
-        and (IsLastDynamicRetry == true or isnull(IsLastDynamicRetry))
-        and (IsLastMerchantRetry == true or isnull(DunAttemptByCycle))
-        and IsDunningCycle == false
-        and coalesce(todatetime(DunningFirstAttemptDateByCycle), Date) == datetime(2025-07-01)
-    | summarize 
-        Pmt_Approval_TransactionId = countif(IsAuthApproval == true),
-        Pmt_Approval_TransactionAmount = sumif(AmountUSD, IsAuthApproval == true);
+%sql
+select SubscriptionId from gold.transactions
 
-datatable(dummy:int) [1]
-| extend
-    Pmt_Approvalcount = 
-        toscalar(For_Dun_Commercial | project Pmt_Approval_TransactionId) +
-        toscalar(For_Dun_Consumer | project Pmt_Approval_TransactionId) +
-        toscalar(For_Pmt_Approval_CI_NoPayNow | project Pmt_Approval_TransactionId) +
-        toscalar(For_Pmt_Approval_MI_NoDun | project Pmt_Approval_TransactionId),
-    Pmt_ApprovalDoller =
-        toscalar(For_Dun_Commercial | project Pmt_Approval_TransactionAmount) +
-        toscalar(For_Dun_Consumer | project Pmt_Approval_TransactionAmount) +
-        toscalar(For_Pmt_Approval_CI_NoPayNow | project Pmt_Approval_TransactionAmount) +
-        toscalar(For_Pmt_Approval_MI_NoDun | project Pmt_Approval_TransactionAmount)
-| project-away dummy
+
+
+
